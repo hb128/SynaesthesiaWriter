@@ -43,7 +43,6 @@ class EditColorMapping(tk.Toplevel):
 
         vsb = ttk.Scrollbar(self, orient="vertical", command=self.treeview.yview)
         self.treeview.configure(yscrollcommand=vsb.set)
-        #vsb.pack(side='right', fill='y')
 
         button_frame = ttk.Frame(self)
         #button_frame.pack(side='bottom', pady=10)
@@ -186,11 +185,14 @@ class TextEditor:
                 "7": "pink",
                 "8": "cyan",
                 "9": "magenta",
-            }
-        self.text = tk.Text(master)
-        self.text.pack()
-        self.text.tag_configure("default", foreground="white")
-
+            }       
+        text_frame = tk.Frame(master)
+        text_frame.pack(side='left', fill='both', expand=True)
+        text_scroll = tk.Scrollbar(text_frame)
+        text_scroll.pack(side='right', fill='y')
+        self.text = tk.Text(text_frame, yscrollcommand=text_scroll.set)
+        self.text.pack(side='left', fill='both', expand=True)
+        text_scroll.config(command=self.text.yview)
         self.text.bind("<Key>", self.highlight_after_event)
         self.text.bind("<KeyRelease>", self.highlight_after_event)
         self.setup_menu()
