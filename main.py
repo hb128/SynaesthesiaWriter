@@ -1,7 +1,7 @@
 import os
 import json
 import tkinter as tk
-from tkinter import ttk, colorchooser,filedialog,colorchooser,messagebox
+from tkinter import ttk,colorchooser,filedialog,colorchooser,messagebox,simpledialog
 import tkinter.font as tkfont
 
 program_path = os.path.dirname(os.path.abspath(__file__))
@@ -52,6 +52,9 @@ class EditColorMapping(tk.Toplevel):
         remove_button = ttk.Button(button_frame, text='Remove Mapping', command=self.remove_mapping)
         remove_button.pack(side='left', padx=5)
         
+        manual_color_button = ttk.Button(button_frame, text='Edit Color Name', command=self.edit_color_string)
+        manual_color_button.pack(side='left', padx=5)
+        
         cancel_button = ttk.Button(button_frame, text='Cancel', command=self.cancel)
         cancel_button.pack(side='right', padx=5)
 
@@ -64,26 +67,44 @@ class EditColorMapping(tk.Toplevel):
         button_frame.grid(row=1, column=0, sticky=tk.EW)
 #        scrollbar_buttons_frame.grid(row=1, column=1, sticky=tk.EW) 
 
-    def edit_color(self, event=None,second_call=False):
+    def edit_color(self, event=None):
         item_id = self.treeview.focus()
         letter = self.treeview.item(item_id)['text']
         color = self.treeview.item(item_id)['values'][0]
-        if not second_call:
-            new_color = colorchooser.askcolor(color=color, parent=self)
-        else:
-            new_color = ['', color]            
+        new_color = colorchooser.askcolor(color=color, parent=self)
         if new_color[1]:
-            print('Update color')
-            self.mapping[letter] = new_color[1]
-            self.treeview.tag_configure(letter, foreground=color, background="white")
-            self.treeview.set(item_id, 'color', new_color[1])
-            self.treeview.item(item_id,tag=letter)
-            # Workaround: Call function again
-            # Otherwise somehow the color of the letters in the table does not update.
-            if not second_call:
-                self.edit_color(None,second_call=True)
-            self.highlight_text_callback(self.mapping)
+            self.update_color(item_id, letter, new_color[1])
 
+    def edit_color_string(self, event=None):
+        item_id = self.treeview.focus()
+        letter = self.treeview.item(item_id)['text']
+        color = self.treeview.item(item_id)['values'][0]
+        new_color = simpledialog.askstring(
+            title=letter, 
+            prompt= "Please enter a new color for the letter " + letter + ":", 
+            initialvalue = color)
+        if new_color is not None:
+            try:
+                # try to create a 1x1 pixel image with the color string
+                image = tk.PhotoImage(width=1, height=1)
+                image.put(new_color, to=(0, 0))
+                # if the color string is valid, the image is created without error
+            except tk.TclError:
+                # if the color string is invalid, a TclError is raised
+                messagebox.showerror('Error', 'Error: The color code ' + new_color + 
+                                     ' does not have the correct format.' +
+                                     'Please provide hexcodes as #abcdef.')
+                return
+            self.update_color(item_id, letter, new_color)
+
+    def update_color(self,item_id,letter,color):          
+        self.mapping[letter] = color
+        self.treeview.tag_configure(letter, foreground=color, background="white")
+        self.treeview.set(item_id, 'color', color)
+        self.treeview.item(item_id,tag=letter)
+        # Apply updated color map temporarily in main window
+        self.highlight_text_callback(self.mapping)
+        
     def delete_mapping(self, event=None):
         item_id = self.treeview.focus()
         next_id = self.treeview.next(item_id)
@@ -92,7 +113,6 @@ class EditColorMapping(tk.Toplevel):
         self.treeview.delete(item_id)
         self.treeview.focus(next_id)
         self.highlight_text_callback(self.mapping)
-
 
     def add_mapping(self):
         letter = tk.simpledialog.askstring('Add Mapping', 'Enter a letter:', parent=self)
@@ -109,7 +129,7 @@ class EditColorMapping(tk.Toplevel):
         letter = self.treeview.item(item_id)['text']
         del self.mapping[letter]
         self.treeview.delete(item_id)
-        
+                
     def cancel(self):
         self.destroy()
     
@@ -130,7 +150,7 @@ class TextEditor:
             self.color_mapping = {
                 "a": "red",
                 "b": "blue",
-                "c": "green",
+                "c": "#2596be",
                 "d": "orange",
                 "e": "purple",
                 "f": "brown",
@@ -138,7 +158,7 @@ class TextEditor:
                 "h": "pink",
                 "i": "cyan",
                 "j": "magenta",
-                "k": "yellow",
+                "k": "navy",
                 "l": "olive",
                 "m": "navy",
                 "n": "teal",
