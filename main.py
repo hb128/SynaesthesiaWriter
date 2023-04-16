@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import filedialog
 import tkinter.font as tkfont
+import json
 
 class TextEditor:
  
@@ -8,6 +9,44 @@ class TextEditor:
         self.master = master
         master.title("Text Editor")
  
+        self.color_mapping = {
+            "a": "#DE1919",
+            "b": "blue",
+            "c": "green",
+            "d": "orange",
+            "e": "purple",
+            "f": "brown",
+            "g": "grey",
+            "h": "pink",
+            "i": "cyan",
+            "j": "magenta",
+            "k": "yellow",
+            "l": "olive",
+            "m": "navy",
+            "n": "teal",
+            "o": "maroon",
+            "p": "lime",
+            "q": "silver",
+            "r": "aqua",
+            "s": "fuchsia",
+            "t": "indigo",
+            "u": "violet",
+            "v": "khaki",
+            "w": "turquoise",
+            "x": "coral",
+            "y": "gold",
+            "z": "orchid",
+            "0": "red",
+            "1": "blue",
+            "2": "green",
+            "3": "orange",
+            "4": "purple",
+            "5": "brown",
+            "6": "grey",
+            "7": "pink",
+            "8": "cyan",
+            "9": "magenta",
+        }
         self.text = Text(master)
         self.text.pack()
  
@@ -27,6 +66,10 @@ class TextEditor:
         format_menu.add_checkbutton(label="Underline", command=self.toggle_underline)
         format_menu.add_command(label="Font", command=self.choose_font)
         menu_bar.add_cascade(label="Format", menu=format_menu)       
+        config_menu = Menu(menu_bar, tearoff=0)
+        config_menu.add_command(label="Load color mapping", command=self.load_color_mapping)
+        config_menu.add_command(label="Save color mapping", command=self.save_color_mapping)
+        menu_bar.add_cascade(label="Color mapping", menu=config_menu)
         self.master.config(menu=menu_bar)
     
     def choose_font(self):
@@ -94,49 +137,22 @@ class TextEditor:
         else:
             self.text.tag_add(underline_tag, "sel.first", "sel.last")
             self.text.tag_config(underline_tag, underline=1)
-                                 
-    def highlight(self, event):
-        mapping = {
-            "a": "#DE1919",
-            "b": "blue",
-            "c": "green",
-            "d": "orange",
-            "e": "purple",
-            "f": "brown",
-            "g": "grey",
-            "h": "pink",
-            "i": "cyan",
-            "j": "magenta",
-            "k": "yellow",
-            "l": "olive",
-            "m": "navy",
-            "n": "teal",
-            "o": "maroon",
-            "p": "lime",
-            "q": "silver",
-            "r": "aqua",
-            "s": "fuchsia",
-            "t": "indigo",
-            "u": "violet",
-            "v": "khaki",
-            "w": "turquoise",
-            "x": "coral",
-            "y": "gold",
-            "z": "orchid",
-            "0": "red",
-            "1": "blue",
-            "2": "green",
-            "3": "orange",
-            "4": "purple",
-            "5": "brown",
-            "6": "grey",
-            "7": "pink",
-            "8": "cyan",
-            "9": "magenta",
-        }
+                
+    def save_color_mapping(self):
+        filename = filedialog.asksaveasfilename()
+        if filename:
+            with open(filename, 'w') as f:
+                json.dump(self.color_mapping, f)
     
+    def load_color_mapping(self):
+        filename = filedialog.askopenfilename()
+        if filename:
+            with open(filename, 'r') as f:
+                self.color_mapping = json.load(f)
+            self.highlight(None)
+            
+    def highlight(self, event):    
         cursor_pos = self.text.index("insert")
-
         for i in range(1, int(self.text.index("end").split(".")[0]) + 1):
             line_start = f"{i}.0"
             line_end = f"{i}.end"
@@ -144,7 +160,7 @@ class TextEditor:
             #print("Line:",line_text)
             for j, char in enumerate(line_text):
                 if char.isalnum():
-                    color = mapping.get(char.lower(), "black")
+                    color = self.color_mapping.get(char.lower(), "black")
                     tag_name = f"color-{char}-{color}".replace(" ", "")
                     start_pos = f"{i}.{j}"
                     end_pos = f"{i}.{j+1}"
@@ -152,6 +168,15 @@ class TextEditor:
                     self.text.tag_config(tag_name, foreground=color)
         self.text.mark_set("insert", self.text.index("insert"))
             
-root = Tk()
-text_editor = TextEditor(root)
-root.mainloop()
+
+def main():
+    root = Tk()
+    text_editor = TextEditor(root)
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        # Close the window and terminate the program
+        root.destroy()
+
+if __name__ == '__main__':
+    main()
