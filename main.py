@@ -187,7 +187,8 @@ class TextEditor:
             }
         self.text = tk.Text(master)
         self.text.pack()
- 
+        self.text.tag_configure("default", foreground="white")
+
         self.text.bind("<Key>", self.highlight_after_event)
         self.text.bind("<KeyRelease>", self.highlight_after_event)
         self.setup_menu()
@@ -310,25 +311,32 @@ class TextEditor:
             self.highlight_text(self.color_mapping)
             
     def highlight_after_event(self, event):   
-        self.highlight_text(self.color_mapping)
+        color = self.color_mapping.get(event.char.lower(), "black")
+        self.text.tag_delete('at_cursor')
+        self.text.tag_config('at_cursor', foreground=color)
+        # Necessary if inserted within text:
+        self.text.tag_add("at_cursor", "insert-1c", "insert")
+        # Required if character is added at the end:
+        self.text.tag_add("at_cursor", "insert", "insert+1c")
+        
+        self.highlight_text(self.color_mapping,event)
     
-    def highlight_text(self, color_mapping):
-        #cursor_pos = self.text.index("insert")
+    def highlight_text(self, color_mapping,event=None):        
         for i in range(1, int(self.text.index("end").split(".")[0]) + 1):
             line_start = f"{i}.0"
             line_end = f"{i}.end"
             line_text = self.text.get(line_start, line_end)
-            #print("Line:",line_text)
             for j, char in enumerate(line_text):
-                if char.isalnum():
+                if char:
                     color = color_mapping.get(char.lower(), "black")
-                    tag_name = f"color-{char}"
+                    tag_name = f"{i}.{j}"
                     start_pos = f"{i}.{j}"
                     end_pos = f"{i}.{j+1}"
+                    self.text.tag_delete(tag_name)
                     self.text.tag_add(tag_name, start_pos, end_pos)
                     self.text.tag_config(tag_name, foreground=color)
         self.text.mark_set("insert", self.text.index("insert"))
-        
+              
 def main():
     root = tk.Tk()
     text_editor = TextEditor(root)
