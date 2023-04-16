@@ -3,6 +3,8 @@ import json
 import tkinter as tk
 from tkinter import ttk,colorchooser,filedialog,colorchooser,messagebox,simpledialog
 import tkinter.font as tkfont
+from docx import Document
+from docx.shared import RGBColor
 
 program_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -198,6 +200,8 @@ class TextEditor:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Open", command=self.open_file)
         file_menu.add_command(label="Save", command=self.save_file)
+        file_menu.add_command(label="Save as Word file (docx)", command=self.save_word_file)
+
         menu_bar.add_cascade(label="File", menu=file_menu)
         format_menu = tk.Menu(menu_bar, tearoff=0)
         format_menu.add_checkbutton(label="Bold", command=self.toggle_bold)
@@ -244,18 +248,36 @@ class TextEditor:
         self.text.config(font=(font_name, font_size))
     
     def open_file(self):
-        filename = filedialog.askopenfilename()
+        filename = filedialog.askopenfilename(filetypes=[('Text files', '*.txt')])
         if filename:
             with open(filename, "r") as file:
                 self.text.delete(1.0, tk.END)
                 self.text.insert(tk.END, file.read())
 
     def save_file(self):
-        filename = filedialog.asksaveasfilename()
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.txt',
+            filetypes=[('Text files', '*.txt')])
         if filename:
             with open(filename, "w") as file:
                 file.write(self.text.get(1.0, tk.END))
-
+                
+    def save_word_file(self):
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.docx',
+            filetypes=[('Text files', '*.docx')])
+        if filename:
+            document = Document()
+            text = self.text.get(1.0, tk.END)
+            paragraph = document.add_paragraph()
+            for char in list(text):
+                run=paragraph.add_run(char)
+                font=run.font
+                color = self.color_mapping.get(char.lower(), "black")
+                rgb = tuple((c//256 for c in self.master.winfo_rgb(color)))
+                font.color.rgb = RGBColor(rgb[0], rgb[1], rgb[2])
+            document.save(filename)
+                
     def toggle_bold(self):
         bold_tag = "bold"
         if self.text.tag_ranges(bold_tag):
@@ -292,6 +314,7 @@ class TextEditor:
                 
     def save_color_mapping(self):
         filename = filedialog.asksaveasfilename(
+            defaultextension='.json',
             initialdir=program_path,
             initialfile='default_color_maping.json',
             filetypes=[('JSON Files', '*.json')]
