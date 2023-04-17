@@ -13,6 +13,9 @@ class EditColorMapping(tk.Toplevel):
     def __init__(self, parent, mapping, colorize_text_callback, update_mapping_callback):
         super().__init__(parent)
         
+        # Block parent window
+        self.grab_set()
+        
         #self.resizable(width=0,height=0)
         self.mapping = mapping.copy()
         self.colorize_text_callback = colorize_text_callback
@@ -62,11 +65,12 @@ class EditColorMapping(tk.Toplevel):
         ok_button = ttk.Button(button_frame, text='OK', command=self.ok)
         ok_button.pack(side='right', padx=5)
         
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+
         # pack the TreeView, Scrollbar, and button frames using grid
         self.treeview.grid(row=0, column=0, sticky=tk.NSEW)
         vsb.grid(row=0, column=1, sticky=tk.NS)
         button_frame.grid(row=1, column=0, sticky=tk.EW)
-#        scrollbar_buttons_frame.grid(row=1, column=1, sticky=tk.EW) 
 
     def edit_color(self, event=None):
         item_id = self.treeview.focus()
@@ -132,23 +136,26 @@ class EditColorMapping(tk.Toplevel):
         self.treeview.delete(item_id)
                 
     def cancel(self):
+        self.colorize_text_callback()
         self.destroy()
     
     def ok(self):
         self.update_mapping_callback(self.mapping)
+        self.colorize_text_callback()
         self.destroy()
         
 class TextEditor:
     def __init__(self, master):
         self.master = master
         master.title("Synaesthesia Writer")
- 
+        self.config_file=os.path.join(program_path,'SynaesthesiaWriterConfig.json');
         try:
-            with open('default_color_maping.json', 'r') as f:
-                self.color_mapping = json.load(f)
+            with open(self.config_file, 'r') as f:
+                print('Found config file', self.config_file, ' -> load it')
+                self.config = json.load(f)
         except:
             # default color mapping
-            self.color_mapping = {
+            default_color_mapping = {
                 "a": "red",
                 "b": "blue",
                 "c": "#2596be",
@@ -185,8 +192,12 @@ class TextEditor:
                 "7": "pink",
                 "8": "cyan",
                 "9": "magenta",
-            }       
-                    
+            }
+            self.config = {
+                'color_mapping': default_color_mapping
+            }
+               
+            
         text_frame = tk.Frame(master)
         text_frame.pack(side='left', fill='both', expand=True)
         text_scroll = tk.Scrollbar(text_frame)
@@ -215,8 +226,8 @@ class TextEditor:
         menu_bar.add_cascade(label="Format", menu=format_menu)       
         config_menu = tk.Menu(menu_bar, tearoff=0)
         config_menu.add_command(label="Edit color mapping", command=self.edit_color_mapping)
-        config_menu.add_command(label="Load color mapping", command=self.load_color_mapping)
-        config_menu.add_command(label="Save color mapping", command=self.save_color_mapping)
+        config_menu.add_command(label="Import color mapping", command=self.import_color_mapping)
+        config_menu.add_command(label="Export color mapping", command=self.export_color_mapping)
         config_menu.add_command(label="Colorize whole text", command=self.colorize_all)
         menu_bar.add_cascade(label="Color mapping", menu=config_menu)
         self.master.config(menu=menu_bar)
@@ -278,7 +289,7 @@ class TextEditor:
             for char in list(text):
                 run=paragraph.add_run(char)
                 font=run.font
-                color = self.color_mapping.get(char.lower(), "black")
+                color = self.config['color_mapping'].get(char.lower(), "black")
                 rgb = tuple((c//256 for c in self.master.winfo_rgb(color)))
                 font.color.rgb = RGBColor(rgb[0], rgb[1], rgb[2])
             document.save(filename)
@@ -306,40 +317,46 @@ class TextEditor:
         else:
             self.text.tag_add(underline_tag, "sel.first", "sel.last")
             self.text.tag_config(underline_tag, underline=1)
-            
+      
+    def save_config(self):
+        print('Save config.')
+        with open(self.config_file, 'w') as f:
+            json.dump(self.config, f)
+    
     def edit_color_mapping(self):
         EditColorMapping(
-            self.master, self.color_mapping, 
+            self.master, self.config['color_mapping'], 
             self.colorize_text, self.update_color_mapping)
-        self.colorize_text(self.color_mapping)
         
     def update_color_mapping(self, new_color_mapping):
-        self.color_mapping = new_color_mapping
-        self.colorize_text(self.color_mapping)
+        print('Update color mapping.')
+        self.config['color_mapping'] = new_color_mapping
+        self.colorize_text()
+        self.save_config()
                 
-    def save_color_mapping(self):
+    def export_color_mapping(self):
         filename = filedialog.asksaveasfilename(
             defaultextension='.json',
             initialdir=program_path,
-            initialfile='default_color_maping.json',
             filetypes=[('JSON Files', '*.json')]
         )
         if filename:
             with open(filename, 'w') as f:
-                json.dump(self.color_mapping, f)
+                json.dump(self.config['color_mapping'], f)
     
-    def load_color_mapping(self):
+    def import_color_mapping(self):
         filename = filedialog.askopenfilename(
             initialdir=program_path,
             filetypes=[('JSON Files', '*.json')]
         )
         if filename:
             with open(filename, 'r') as f:
-                self.color_mapping = json.load(f)
-            self.colorize_text(self.color_mapping)
+                self.config['color_mapping'] = json.load(f)
+            self.colorize_text()
+            self.save_config()
             
     def colorize_after_event(self, event):   
-        color = self.color_mapping.get(event.char.lower(), "black")
+        color = self.config['color_mapping'].get(event.char.lower(), "black")
         self.text.tag_delete('at_cursor')
         self.text.tag_config('at_cursor', foreground=color)
         # Necessary if inserted within text:
@@ -349,18 +366,22 @@ class TextEditor:
         
         index = self.text.index('insert')
         line_num = int(index.split('.')[0])
-        self.colorize_line(self.color_mapping,line_num,event)
-        self.colorize_line(self.color_mapping,self.last_line,event)
+        self.colorize_line(line_num)
+        self.colorize_line(self.last_line)
         self.last_line=line_num
 
     def colorize_all(self):
-        self.colorize_text(self.color_mapping)
+        self.colorize_text()
         
-    def colorize_text(self, color_mapping,event=None):
+    def colorize_text(self, color_mapping=None):
+        if not color_mapping:
+            color_mapping=self.config['color_mapping'];
         for line in range(1, int(self.text.index("end").split(".")[0]) + 1):
-            self.colorize_line(color_mapping,line,event=event)
+            self.colorize_line(line,color_mapping)
             
-    def colorize_line(self, color_mapping,line,event=None):        
+    def colorize_line(self,line,color_mapping=None): 
+        if not color_mapping:
+            color_mapping=self.config['color_mapping'];
         line_start = f"{line}.0"
         line_end = f"{line}.end"
         line_text = self.text.get(line_start, line_end)
