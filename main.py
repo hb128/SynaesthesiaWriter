@@ -10,12 +10,12 @@ program_path = os.path.dirname(os.path.abspath(__file__))
 
         
 class EditColorMapping(tk.Toplevel):
-    def __init__(self, parent, mapping, highlight_text_callback, update_mapping_callback):
+    def __init__(self, parent, mapping, colorize_text_callback, update_mapping_callback):
         super().__init__(parent)
         
         #self.resizable(width=0,height=0)
         self.mapping = mapping.copy()
-        self.highlight_text_callback = highlight_text_callback
+        self.colorize_text_callback = colorize_text_callback
         self.update_mapping_callback = update_mapping_callback
         
         # Workaround from https://stackoverflow.com/questions/61105126/tag-configure-is-not-working-while-using-theme-ttk-treeview
@@ -104,7 +104,7 @@ class EditColorMapping(tk.Toplevel):
         self.treeview.set(item_id, 'color', color)
         self.treeview.item(item_id,tag=letter)
         # Apply updated color map temporarily in main window
-        self.highlight_text_callback(self.mapping)
+        self.colorize_text_callback(self.mapping)
         
     def delete_mapping(self, event=None):
         item_id = self.treeview.focus()
@@ -113,7 +113,7 @@ class EditColorMapping(tk.Toplevel):
         del self.mapping[letter]
         self.treeview.delete(item_id)
         self.treeview.focus(next_id)
-        self.highlight_text_callback(self.mapping)
+        self.colorize_text_callback(self.mapping)
 
     def add_mapping(self):
         letter = tk.simpledialog.askstring('Add Mapping', 'Enter a letter:', parent=self)
@@ -121,7 +121,7 @@ class EditColorMapping(tk.Toplevel):
             self.mapping[letter] = '#ffffff'
             item = self.treeview.insert('', 'end', text=letter, values=(letter, '#ffffff', 'Edit'))
             self.treeview.set(item, 'color', '#ffffff')
-            self.highlight_text_callback(self.mapping)
+            self.colorize_text_callback(self.mapping)
         elif letter in self.mapping:
             messagebox.showerror('Error', 'Error: Letter already in list.')
             
@@ -186,6 +186,7 @@ class TextEditor:
                 "8": "cyan",
                 "9": "magenta",
             }       
+                    
         text_frame = tk.Frame(master)
         text_frame.pack(side='left', fill='both', expand=True)
         text_scroll = tk.Scrollbar(text_frame)
@@ -193,9 +194,10 @@ class TextEditor:
         self.text = tk.Text(text_frame, yscrollcommand=text_scroll.set)
         self.text.pack(side='left', fill='both', expand=True)
         text_scroll.config(command=self.text.yview)
-        self.text.bind("<Key>", self.highlight_after_event)
-        self.text.bind("<KeyRelease>", self.highlight_after_event)
+        self.text.bind("<Key>", self.colorize_after_event)
+        self.text.bind("<Control-v>", self.colorize_after_event)
         self.setup_menu()
+        self.last_line=0
 
     def setup_menu(self):
         menu_bar = tk.Menu(self.master)
@@ -215,6 +217,7 @@ class TextEditor:
         config_menu.add_command(label="Edit color mapping", command=self.edit_color_mapping)
         config_menu.add_command(label="Load color mapping", command=self.load_color_mapping)
         config_menu.add_command(label="Save color mapping", command=self.save_color_mapping)
+        config_menu.add_command(label="Colorize whole text", command=self.colorize_all)
         menu_bar.add_cascade(label="Color mapping", menu=config_menu)
         self.master.config(menu=menu_bar)
     
@@ -307,12 +310,12 @@ class TextEditor:
     def edit_color_mapping(self):
         EditColorMapping(
             self.master, self.color_mapping, 
-            self.highlight_text, self.update_color_mapping)
-        self.highlight_text(self.color_mapping)
+            self.colorize_text, self.update_color_mapping)
+        self.colorize_text(self.color_mapping)
         
     def update_color_mapping(self, new_color_mapping):
         self.color_mapping = new_color_mapping
-        self.highlight_text(self.color_mapping)
+        self.colorize_text(self.color_mapping)
                 
     def save_color_mapping(self):
         filename = filedialog.asksaveasfilename(
@@ -333,9 +336,9 @@ class TextEditor:
         if filename:
             with open(filename, 'r') as f:
                 self.color_mapping = json.load(f)
-            self.highlight_text(self.color_mapping)
+            self.colorize_text(self.color_mapping)
             
-    def highlight_after_event(self, event):   
+    def colorize_after_event(self, event):   
         color = self.color_mapping.get(event.char.lower(), "black")
         self.text.tag_delete('at_cursor')
         self.text.tag_config('at_cursor', foreground=color)
@@ -344,23 +347,32 @@ class TextEditor:
         # Required if character is added at the end:
         self.text.tag_add("at_cursor", "insert", "insert+1c")
         
-        self.highlight_text(self.color_mapping,event)
-    
-    def highlight_text(self, color_mapping,event=None):        
-        for i in range(1, int(self.text.index("end").split(".")[0]) + 1):
-            line_start = f"{i}.0"
-            line_end = f"{i}.end"
-            line_text = self.text.get(line_start, line_end)
-            for j, char in enumerate(line_text):
-                if char:
-                    color = color_mapping.get(char.lower(), "black")
-                    tag_name = f"{i}.{j}"
-                    start_pos = f"{i}.{j}"
-                    end_pos = f"{i}.{j+1}"
-                    self.text.tag_delete(tag_name)
-                    self.text.tag_add(tag_name, start_pos, end_pos)
-                    self.text.tag_config(tag_name, foreground=color)
-        self.text.mark_set("insert", self.text.index("insert"))
+        index = self.text.index('insert')
+        line_num = int(index.split('.')[0])
+        self.colorize_line(self.color_mapping,line_num,event)
+        self.colorize_line(self.color_mapping,self.last_line,event)
+        self.last_line=line_num
+
+    def colorize_all(self):
+        self.colorize_text(self.color_mapping)
+        
+    def colorize_text(self, color_mapping,event=None):
+        for line in range(1, int(self.text.index("end").split(".")[0]) + 1):
+            self.colorize_line(color_mapping,line,event=event)
+            
+    def colorize_line(self, color_mapping,line,event=None):        
+        line_start = f"{line}.0"
+        line_end = f"{line}.end"
+        line_text = self.text.get(line_start, line_end)
+        for j, char in enumerate(line_text):
+            if char:
+                color = color_mapping.get(char.lower(), "black")
+                tag_name = f"{line}.{j}"
+                start_pos = f"{line}.{j}"
+                end_pos = f"{line}.{j+1}"
+                self.text.tag_delete(tag_name)
+                self.text.tag_add(tag_name, start_pos, end_pos)
+                self.text.tag_config(tag_name, foreground=color)
               
 def main():
     root = tk.Tk()
