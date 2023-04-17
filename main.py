@@ -141,7 +141,7 @@ class EditColorMapping(tk.Toplevel):
 class TextEditor:
     def __init__(self, master):
         self.master = master
-        master.title("Text Editor")
+        master.title("Synaesthesia Writer")
  
         try:
             with open('default_color_maping.json', 'r') as f:
