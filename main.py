@@ -5,6 +5,7 @@ from tkinter import ttk,colorchooser,filedialog,colorchooser,messagebox,simpledi
 import tkinter.font as tkfont
 from docx import Document
 from docx.shared import RGBColor
+import platformdirs
 
 program_path = os.path.dirname(os.path.abspath(__file__))
 
@@ -148,7 +149,9 @@ class TextEditor:
     def __init__(self, master):
         self.master = master
         master.title("Synaesthesia Writer")
-        self.config_file=os.path.join(program_path,'SynaesthesiaWriterConfig.json');
+        self.config_file=os.path.join(
+            platformdirs.user_config_dir(appname="SynaesthesiaWriter"),
+            'synaesthesia_writer_config.json');
         try:
             with open(self.config_file, 'r') as f:
                 print('Found config file', self.config_file, ' -> load it')
@@ -319,7 +322,8 @@ class TextEditor:
             self.text.tag_config(underline_tag, underline=1)
       
     def save_config(self):
-        print('Save config.')
+        print('Save config at', self.config_file)
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
         with open(self.config_file, 'w') as f:
             json.dump(self.config, f)
     
